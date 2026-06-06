@@ -23,7 +23,10 @@ struct LanguageOption: Equatable {
         LanguageOption(code: "pt",     baiduCode: "pt",  appleCode: "pt",      displayName: "Português"),
         LanguageOption(code: "it",     baiduCode: "it",  appleCode: "it",      displayName: "Italiano"),
         LanguageOption(code: "ru",     baiduCode: "ru",  appleCode: "ru",      displayName: "Русский"),
+        LanguageOption(code: "uk",     baiduCode: "ukr", appleCode: "uk",      displayName: "Українська"),
         LanguageOption(code: "ar",     baiduCode: "ara", appleCode: "ar",      displayName: "العربية"),
+        LanguageOption(code: "fa",     baiduCode: "per", appleCode: "fa",      displayName: "فارسی"),
+        LanguageOption(code: "tr",     baiduCode: "tr",  appleCode: "tr",      displayName: "Türkçe"),
         LanguageOption(code: "th",     baiduCode: "th",  appleCode: "th",      displayName: "ไทย"),
         LanguageOption(code: "vi",     baiduCode: "vie", appleCode: "vi",      displayName: "Tiếng Việt"),
     ]
