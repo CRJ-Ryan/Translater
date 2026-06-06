@@ -1,6 +1,6 @@
 import AppKit
 
-/// Settings window for choosing languages and configuring translation API credentials.
+/// Settings window — floats above other windows so it doesn't get lost.
 final class SettingsWindow: NSWindow {
 
     private var sourceLanguage: LanguageOption
@@ -31,14 +31,15 @@ final class SettingsWindow: NSWindow {
         self.onCredentialsChange = onCredentialsChange
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 420),
-            styleMask: [.titled, .closable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 310),
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
 
         title = "翻译设置"
         isReleasedWhenClosed = false
+        level = .floating
         setupUI()
         populateLanguages()
         selectCurrent()
@@ -49,25 +50,26 @@ final class SettingsWindow: NSWindow {
 
     private func setupUI() {
         guard let contentView = contentView else { return }
+        let pad: CGFloat = 24
 
-        // === Language Section ===
-        let langHeader = makeHeader("语言设置")
-
+        // Source label + popup
         let srcTitle = makeLabel("源语言")
         sourcePopup.controlSize = .small
         sourcePopup.target = self
         sourcePopup.action = #selector(sourceDidChange)
 
+        // Swap button
         let swapBtn = NSButton(title: "⇄ 交换", target: self, action: #selector(swapTapped))
         swapBtn.bezelStyle = .rounded
         swapBtn.controlSize = .small
 
+        // Target label + popup
         let tgtTitle = makeLabel("目标语言")
         targetPopup.controlSize = .small
         targetPopup.target = self
         targetPopup.action = #selector(targetDidChange)
 
-        // Quick presets
+        // Presets in a row
         let presets: [(String, String, String)] = [
             ("中→英", "zh", "en"),
             ("英→中", "en", "zh"),
@@ -83,107 +85,100 @@ final class SettingsWindow: NSWindow {
             presetBtns.append(b)
         }
 
-        // === Baidu API Section ===
-        let apiHeader = makeHeader("百度翻译 API（可选，不填则用免费引擎）")
-        let apiHint = makeLabel("注册获取: https://fanyi-api.baidu.com")
+        // Separator
+        let sep = NSBox()
+        sep.boxType = .separator
+
+        // API section (compact)
+        let apiTitle = makeLabel("百度翻译 API（可选，不填则用免费引擎）")
+        let apiHint = NSTextField(labelWithString: "注册: fanyi-api.baidu.com → 管理控制台")
         apiHint.font = .systemFont(ofSize: 10)
         apiHint.textColor = .tertiaryLabelColor
 
-        let appIDLabel = makeLabel("APP ID")
+        let idLabel = makeLabel("APP ID")
         appIDField.controlSize = .small
-        appIDField.placeholderString = "输入百度翻译 APP ID"
+        appIDField.placeholderString = "输入 APP ID"
         appIDField.stringValue = baiduAppID
         appIDField.delegate = self
 
-        let secretLabel = makeLabel("密钥 (Secret Key)")
+        let skLabel = makeLabel("密钥 (Secret Key)")
         secretField.controlSize = .small
-        secretField.placeholderString = "输入百度翻译 Secret Key"
+        secretField.placeholderString = "输入 Secret Key"
         secretField.stringValue = baiduSecret
         secretField.delegate = self
 
-        // === Layout ===
-        let allViews: [NSView] = [
-            langHeader, srcTitle, sourcePopup, swapBtn, tgtTitle, targetPopup,
-            apiHeader, apiHint, appIDLabel, appIDField, secretLabel, secretField,
+        // Layout
+        let all: [NSView] = [
+            srcTitle, sourcePopup, swapBtn, tgtTitle, targetPopup,
+            sep, apiTitle, apiHint, idLabel, appIDField, skLabel, secretField,
         ] + presetBtns
-        for v in allViews { v.translatesAutoresizingMaskIntoConstraints = false }
-        for v in allViews { contentView.addSubview(v) }
+        for v in all {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            contentView.addSubview(v)
+        }
 
-        let pad: CGFloat = 24
-        var constraints: [NSLayoutConstraint] = []
-
-        // Language header
-        constraints += [
-            langHeader.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            langHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
-        ]
-
-        // Source
-        constraints += [
-            srcTitle.topAnchor.constraint(equalTo: langHeader.bottomAnchor, constant: 10),
+        NSLayoutConstraint.activate([
+            // Source
+            srcTitle.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             srcTitle.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
 
             sourcePopup.topAnchor.constraint(equalTo: srcTitle.bottomAnchor, constant: 4),
             sourcePopup.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
-            sourcePopup.widthAnchor.constraint(equalToConstant: 130),
+            sourcePopup.widthAnchor.constraint(equalToConstant: 120),
 
             swapBtn.centerYAnchor.constraint(equalTo: sourcePopup.centerYAnchor),
-            swapBtn.leadingAnchor.constraint(equalTo: sourcePopup.trailingAnchor, constant: 12),
-        ]
+            swapBtn.leadingAnchor.constraint(equalTo: sourcePopup.trailingAnchor, constant: 8),
 
-        // Target
-        constraints += [
+            // Target — constrain trailing to window edge so it won't be clipped
             tgtTitle.topAnchor.constraint(equalTo: srcTitle.topAnchor),
-            tgtTitle.leadingAnchor.constraint(equalTo: swapBtn.trailingAnchor, constant: 20),
+            tgtTitle.leadingAnchor.constraint(equalTo: swapBtn.trailingAnchor, constant: 16),
 
             targetPopup.topAnchor.constraint(equalTo: tgtTitle.bottomAnchor, constant: 4),
             targetPopup.leadingAnchor.constraint(equalTo: tgtTitle.leadingAnchor),
-            targetPopup.widthAnchor.constraint(equalToConstant: 130),
-        ]
+            targetPopup.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -pad),
+        ])
 
-        // Presets
-        constraints += presetBtns.enumerated().map { i, btn in
-            let prev: NSView = i == 0 ? sourcePopup : presetBtns[i - 1]
-            return [
-                btn.topAnchor.constraint(equalTo: prev.bottomAnchor, constant: 6),
-                btn.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
-            ]
-        }.flatMap { $0 }
+        // Presets in a row
+        for (i, btn) in presetBtns.enumerated() {
+            let leading: NSLayoutXAxisAnchor = i == 0
+                ? contentView.leadingAnchor
+                : presetBtns[i - 1].trailingAnchor
+            NSLayoutConstraint.activate([
+                btn.topAnchor.constraint(equalTo: sourcePopup.bottomAnchor, constant: 10),
+                btn.leadingAnchor.constraint(equalTo: leading, constant: i == 0 ? pad : 8),
+            ])
+        }
 
-        // Separator-like spacing
+        // Separator
         let lastPreset = presetBtns.last ?? sourcePopup
+        NSLayoutConstraint.activate([
+            sep.topAnchor.constraint(equalTo: lastPreset.bottomAnchor, constant: 14),
+            sep.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
+            sep.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -pad),
+        ])
 
         // API section
-        constraints += [
-            apiHeader.topAnchor.constraint(equalTo: lastPreset.bottomAnchor, constant: 24),
-            apiHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
+        NSLayoutConstraint.activate([
+            apiTitle.topAnchor.constraint(equalTo: sep.bottomAnchor, constant: 12),
+            apiTitle.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
 
-            apiHint.topAnchor.constraint(equalTo: apiHeader.bottomAnchor, constant: 2),
+            apiHint.topAnchor.constraint(equalTo: apiTitle.bottomAnchor, constant: 2),
             apiHint.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
 
-            appIDLabel.topAnchor.constraint(equalTo: apiHint.bottomAnchor, constant: 12),
-            appIDLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
+            idLabel.topAnchor.constraint(equalTo: apiHint.bottomAnchor, constant: 10),
+            idLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
 
-            appIDField.topAnchor.constraint(equalTo: appIDLabel.bottomAnchor, constant: 2),
+            appIDField.topAnchor.constraint(equalTo: idLabel.bottomAnchor, constant: 2),
             appIDField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
             appIDField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -pad),
 
-            secretLabel.topAnchor.constraint(equalTo: appIDField.bottomAnchor, constant: 12),
-            secretLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
+            skLabel.topAnchor.constraint(equalTo: appIDField.bottomAnchor, constant: 8),
+            skLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
 
-            secretField.topAnchor.constraint(equalTo: secretLabel.bottomAnchor, constant: 2),
+            secretField.topAnchor.constraint(equalTo: skLabel.bottomAnchor, constant: 2),
             secretField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: pad),
             secretField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -pad),
-        ]
-
-        NSLayoutConstraint.activate(constraints)
-    }
-
-    private func makeHeader(_ text: String) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.textColor = .labelColor
-        return label
+        ])
     }
 
     private func makeLabel(_ text: String) -> NSTextField {
@@ -235,7 +230,6 @@ final class SettingsWindow: NSWindow {
         baiduAppID = appIDField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         baiduSecret = secretField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         onCredentialsChange?(baiduAppID, baiduSecret)
-        print("[Settings] 百度凭证已更新")
     }
 
     // MARK: - Actions
@@ -261,8 +255,6 @@ final class SettingsWindow: NSWindow {
         applyLanguages()
     }
 }
-
-// MARK: - NSTextFieldDelegate
 
 extension SettingsWindow: NSTextFieldDelegate {
     func controlTextDidChange(_ obj: Notification) {
