@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private enum Keys {
         static let sourceLanguage = "sourceLanguageCode"
         static let targetLanguage = "targetLanguageCode"
+        static let baiduAppID = "baiduAppID"
+        static let baiduSecret = "baiduSecretKey"
     }
 
     // MARK: - App Lifecycle
@@ -171,7 +173,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let target = loadTargetLanguage()
             translationService = TranslationService()
             translationService?.setLanguages(source: source, target: target)
-            print("[Translater] 🌐 翻译服务: \(source.displayName) → \(target.displayName)")
+            // Load Baidu credentials
+            translationService?.baiduAppID = loadBaiduAppID()
+            translationService?.baiduSecretKey = loadBaiduSecret()
+            let engineName = translationService?.isBaiduConfigured == true ? "百度" : "MyMemory（免费）"
+            print("[Translater] 🌐 翻译引擎: \(engineName) | \(source.displayName) → \(target.displayName)")
         }
 
         eventTapManager.start()
@@ -203,6 +209,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(target.code, forKey: Keys.targetLanguage)
     }
 
+    private func loadBaiduAppID() -> String {
+        UserDefaults.standard.string(forKey: Keys.baiduAppID) ?? ""
+    }
+
+    private func loadBaiduSecret() -> String {
+        UserDefaults.standard.string(forKey: Keys.baiduSecret) ?? ""
+    }
+
+    private func saveBaiduCredentials(appID: String, secret: String) {
+        UserDefaults.standard.set(appID, forKey: Keys.baiduAppID)
+        UserDefaults.standard.set(secret, forKey: Keys.baiduSecret)
+    }
+
     // MARK: - Settings
 
     @objc private func openSettings() {
@@ -213,12 +232,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let source = loadSourceLanguage()
         let target = loadTargetLanguage()
+        let appID = loadBaiduAppID()
+        let secret = loadBaiduSecret()
 
-        settingsWindow = SettingsWindow(source: source, target: target) { [weak self] source, target in
-            self?.saveLanguages(source: source, target: target)
-            self?.translationService?.setLanguages(source: source, target: target)
-            print("[Translater] 🔄 语言已切换: \(source.displayName) → \(target.displayName)")
-        }
+        settingsWindow = SettingsWindow(
+            source: source,
+            target: target,
+            baiduAppID: appID,
+            baiduSecret: secret,
+            onApply: { [weak self] source, target in
+                self?.saveLanguages(source: source, target: target)
+                self?.translationService?.setLanguages(source: source, target: target)
+            },
+            onCredentialsChange: { [weak self] appID, secret in
+                self?.saveBaiduCredentials(appID: appID, secret: secret)
+                self?.translationService?.baiduAppID = appID
+                self?.translationService?.baiduSecretKey = secret
+                let status = self?.translationService?.isBaiduConfigured == true ? "✅ 百度" : "免费引擎"
+                print("[Translater] 🔑 翻译引擎切换: \(status)")
+            }
+        )
 
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
