@@ -27,6 +27,9 @@ struct LanguageOption: Equatable {
         LanguageOption(code: "ar",     baiduCode: "ara", appleCode: "ar",      displayName: "العربية"),
         LanguageOption(code: "fa",     baiduCode: "per", appleCode: "fa",      displayName: "فارسی"),
         LanguageOption(code: "tr",     baiduCode: "tr",  appleCode: "tr",      displayName: "Türkçe"),
+        LanguageOption(code: "id",     baiduCode: "id",  appleCode: "id",      displayName: "Bahasa Indonesia"),
+        LanguageOption(code: "ms",     baiduCode: "may", appleCode: "ms",      displayName: "Bahasa Melayu"),
+        LanguageOption(code: "tl",     baiduCode: "tl",  appleCode: "fil",     displayName: "Filipino"),
         LanguageOption(code: "th",     baiduCode: "th",  appleCode: "th",      displayName: "ไทย"),
         LanguageOption(code: "vi",     baiduCode: "vie", appleCode: "vi",      displayName: "Tiếng Việt"),
     ]
