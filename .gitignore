@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+*.app
+*.dSYM
+*.xcuserdata
+DerivedData/
+
+# Local config
+.claude/
+
+# Build output
+/Translater
+build/
+
+# SwiftPM
+.build/
+Packages/
+*.xcodeproj
