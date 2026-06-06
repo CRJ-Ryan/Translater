@@ -78,12 +78,24 @@ final class TranslationService {
                 }
             }
 
-            // 3. Apple on-device (last resort)
+            // 3. Apple on-device (last resort, with timeout to avoid hanging)
             if result == nil && self.appleAvailable {
+                let appleTask = Task { try await self.appleTranslate(trimmed) }
+                let timeoutTask = Task {
+                    try await Task.sleep(nanoseconds: 8_000_000_000) // 8s timeout
+                    appleTask.cancel()
+                }
                 do {
-                    result = try await self.appleTranslate(trimmed)
+                    result = try await appleTask.value
+                    timeoutTask.cancel()
+                    print("[Translation] ✅ Apple 离线翻译可用")
                 } catch {
-                    print("[Translation] Apple 翻译也失败: \(error.localizedDescription)")
+                    timeoutTask.cancel()
+                    if error is CancellationError {
+                        print("[Translation] ⏰ Apple 超时，跳过离线翻译")
+                    } else {
+                        print("[Translation] Apple 失败: \(error.localizedDescription)")
+                    }
                     self.appleAvailable = false
                 }
             }
