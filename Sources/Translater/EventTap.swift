@@ -53,6 +53,10 @@ final class EventTapManager {
     // Cooldown: ignore AX reads for a short period after text replacement
     private var cooldownUntil: Date = .distantPast
 
+    // Health check: periodically verify the event tap is still alive
+    private var healthCheckTimer: Timer?
+    private let healthCheckInterval: TimeInterval = 30.0
+
     // MARK: - Start / Stop (Event Tap lifecycle)
 
     func start() {
@@ -96,6 +100,7 @@ final class EventTapManager {
         )
 
         startIdleTimer()
+        startHealthCheck()
         print("[EventTap] ✅ Event tap 已启动 (监听: \(isMonitoring ? "开" : "关"))")
     }
 
@@ -115,6 +120,7 @@ final class EventTapManager {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         cancelReadWorkItem()
         stopIdleTimer()
+        stopHealthCheck()
         resetAllState()
         print("[EventTap] ⏹️ Event tap 已停止")
     }
@@ -222,6 +228,60 @@ final class EventTapManager {
     private func resetIdleTimer() {
         guard idleTimer != nil else { return }
         startIdleTimer()
+    }
+
+    // MARK: - Health Check
+
+    private func startHealthCheck() {
+        stopHealthCheck()
+        healthCheckTimer = Timer.scheduledTimer(withTimeInterval: healthCheckInterval, repeats: true) { [weak self] _ in
+            guard let self = self, self.isRunning else { return }
+            if let tap = self.eventTap, !CGEvent.tapIsEnabled(tap: tap) {
+                print("[EventTap] ⚠️ Event tap 已被系统杀死，尝试重启...")
+                self.restartEventTap()
+            }
+        }
+    }
+
+    private func stopHealthCheck() {
+        healthCheckTimer?.invalidate()
+        healthCheckTimer = nil
+    }
+
+    private func restartEventTap() {
+        // Tear down old tap
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+        }
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+        }
+        eventTap = nil
+        runLoopSource = nil
+
+        // Re-create
+        let eventMask = (1 << CGEventType.keyDown.rawValue)
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+
+        eventTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(eventMask),
+            callback: eventTapCallback,
+            userInfo: selfPtr
+        )
+
+        guard let tap = eventTap else {
+            print("[EventTap] ❌ 重启失败，请手动重启 App")
+            return
+        }
+
+        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+
+        print("[EventTap] ✅ Event tap 已自动恢复")
     }
 
     // MARK: - AX Text Reading
@@ -420,9 +480,11 @@ final class EventTapManager {
             return Unmanaged.passRetained(event)
         }
 
-        // On first keystroke: capture baseline BEFORE the text field changes
+        // On first keystroke: capture baseline async (avoid blocking event callback)
         if !typingActive {
-            captureBaseline()
+            DispatchQueue.main.async { [weak self] in
+                self?.captureBaseline()
+            }
         }
 
         // Backspace — read AX immediately
